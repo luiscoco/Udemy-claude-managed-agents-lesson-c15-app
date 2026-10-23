@@ -1,0 +1,42 @@
+import Anthropic from "@anthropic-ai/sdk";
+import type { BetaManagedAgentsSessionEvent as PersistedEvent } from "@anthropic-ai/sdk/resources/beta/sessions/events";
+type Usage = { input: number; output: number; cacheRead: number; cacheCreate: number };
+export function makeRecorder() {
+  const seen = new Set<string>();
+  const evidence = {
+    compactions: [] as { id: string; processedAt: string }[], usage: null as Usage | null,
+    historyReadComplete: false, scope: "Observed persisted events; caller defines session/thread coverage"
+  };
+  return {
+    evidence,
+    ingest(event: PersistedEvent) {
+      if (seen.has(event.id)) return;
+      seen.add(event.id);
+      if (event.type === "agent.thread_context_compacted") evidence.compactions.push({
+        id: event.id, processedAt: event.processed_at
+      });
+      if (event.type === "span.model_request_end") {
+        const u = event.model_usage;
+        evidence.usage ??= { input: 0, output: 0, cacheRead: 0, cacheCreate: 0 };
+        evidence.usage.input += u.input_tokens;
+        evidence.usage.output += u.output_tokens;
+        evidence.usage.cacheRead += u.cache_read_input_tokens;
+        evidence.usage.cacheCreate += u.cache_creation_input_tokens;
+      }
+    },
+    markHistoryReadStarted() { evidence.historyReadComplete = false; },
+    markHistoryReadComplete() { evidence.historyReadComplete = true; }
+  };
+}
+// No top-level requests. Ownership and thread scope must be checked by the caller.
+export async function reconcileHistory(client: Anthropic, sessionId: string, recorder: ReturnType<typeof makeRecorder>) {
+  recorder.markHistoryReadStarted();
+  for await (const event of client.beta.sessions.events.list(sessionId, { order: "asc" }, { maxRetries: 2, timeout: 10000 })) {
+    recorder.ingest(event);
+  }
+  recorder.markHistoryReadComplete();
+  return recorder.evidence;
+}
+// Feed canonical records from an already-open stream to recorder.ingest after narrowing
+// away nonpersisted previews. Handle requires_action, errors and incomplete streams separately.
+// Persist the reducer result and its dedupe state atomically, or rebuild from durable records.

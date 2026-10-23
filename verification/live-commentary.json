@@ -1,0 +1,28 @@
+{
+  "source": "live-provider-commentary",
+  "sessionId": "sesn_01Db9cxcp3ut9cexTKhoRNRh",
+  "answer": "This teaching experiment, titled \"Context Growth and Compaction,\" tests correct token/event counting during context compaction by ensuring only observations within the covered event window are summed. Key steps include deduplicating persisted event IDs, recording explicit compaction events, and summing only distinct request spans. The lesson emphasizes not inferring current context size from historical totals.",
+  "stopReason": "end_turn",
+  "eventTypes": [
+    "session.status_running",
+    "session.thread_status_running",
+    "user.message",
+    "span.model_request_start",
+    "agent.message",
+    "span.model_request_end",
+    "session.thread_status_idle",
+    "session.usage",
+    "session.status_idle"
+  ],
+  "requestUsage": [
+    {
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "input_tokens": 598,
+      "output_tokens": 81,
+      "speed": "standard"
+    }
+  ],
+  "experimentHash": "9bac7f21817f7a36034bc1257d1d6fa4aa1090302c3ddee63eaeb7f47b9856d0",
+  "scope": "A real text-only model response about the local experiment. External integrations and the experiment's correctness are not certified by this response."
+}
