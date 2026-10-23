@@ -42,27 +42,79 @@ CLAUDE_MANAGED_ENVIRONMENT_ID=your_environment_id
 PORT=3015
 ```
 
-## How the application was developed
+## How the app was build
 
-The browser collects inputs; the Node host validates requests; the lesson implementation produces observable evidence. The architecture page walks through the real source with numbered steps, prerequisite configuration, source filenames and code excerpts.
+### 1. Deduplicate the authored observation window
 
-### Lesson implementation
+A Set prevents repeated request and compaction labels from being counted twice. This tiny fixture uses labels as identities; production consumers need the actual persisted event IDs.
 
-[src/lesson.ts](https://github.com/luiscoco/Udemy-claude-managed-agents-lesson-c15-app/blob/main/src/lesson.ts)
+Source: [src/lesson.ts](src/lesson.ts#L13) · selected statements
 
 ```typescript
-  async run(input) {
+const seen = new Set<string>();
 
-const seen=new Set<string>();let compactions=0,inputTokens=0;
-for(const kind of list(input,"events")){const id=String(kind);if(seen.has(id))continue;seen.add(id);if(id==="compaction")compactions++;if(id==="request")inputTokens+=120;}
-const complete=flag(input,"historyComplete");
-return report(complete?"passed":"incomplete","Count only observations in the covered event window",{compactions,inputTokens,historyComplete:complete,windowOccupancy:"unknown"},["Deduplicate persisted event IDs","Record explicit context-compacted events","Sum only distinct request spans","Do not infer current context size from totals"]);
+let compactions = 0,
+  inputTokens = 0;
 
-  }
-};
+for (const kind of list(input, "events")) {
+  const id = String(kind);
+  if (seen.has(id)) continue;
+  seen.add(id);
+  if (id === "compaction") compactions++;
+  if (id === "request") inputTokens += 120;
+}
 ```
 
-Read the architecture page for the remaining source excerpts and explanations, including input handling and optional provider behavior. The diagram describes this application, rather than implying that an external integration has been implemented.
+### 2. Retain incomplete coverage as a distinct outcome
+
+historyComplete chooses passed or incomplete. The sample sums only its distinct authored request observations and reports windowOccupancy as unknown; accumulated token totals do not measure the current context window.
+
+Source: [src/lesson.ts](src/lesson.ts#L15) · selected statements
+
+```typescript
+const complete = flag(input, "historyComplete");
+
+return report(
+  complete ? "passed" : "incomplete",
+  "Count only observations in the covered event window",
+  {
+    compactions,
+    inputTokens,
+    historyComplete: complete,
+    windowOccupancy: "unknown",
+  },
+  [
+    "Deduplicate persisted event IDs",
+    "Record explicit context-compacted events",
+    "Sum only distinct request spans",
+    "Do not infer current context size from totals",
+  ],
+);
+```
+
+### Check your understanding
+
+Run **Deduplicate an observed compaction** in the application. Compare the result with these scenario expectations:
+
+```json
+{
+  "input": {
+    "events": [
+      "request",
+      "compaction",
+      "request",
+      "compaction"
+    ],
+    "historyComplete": true
+  },
+  "expectedOutcome": "passed",
+  "checkEvidence": {
+    "compactions": 1
+  }
+}
+```
+
+Then try **Keep incomplete coverage visible**. Its expected outcome is `incomplete`; identify the condition or evidence field that explains the difference.
 
 ## Validation
 
